@@ -1,0 +1,212 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  checks: write
+
+jobs:
+  lint:
+    name: Lint & Format Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Run ESLint
+        run: bun run lint
+
+      - name: Check formatting
+        run: bun run format:check
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build WebAssembly
+        run: bun run asbuild
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: wasm-build
+          path: build/
+          retention-days: 7
+
+  test:
+    name: Test
+    runs-on: ${{ matrix.os }}
+    needs: build
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build WebAssembly
+        run: bun run asbuild
+
+      - name: Run tests with coverage
+        if: matrix.os == 'ubuntu-latest'
+        run: bun test --coverage --coverage-report=lcov
+
+      - name: Run tests
+        if: matrix.os != 'ubuntu-latest'
+        run: bun test
+
+      - name: Upload coverage to Codecov
+        if: matrix.os == 'ubuntu-latest'
+        uses: codecov/codecov-action@v4
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage/lcov.info
+          fail_ci_if_error: false
+
+  size:
+    name: WASM Size Check
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build WebAssembly
+        run: bun run asbuild:release
+
+      - name: Check WASM size
+        run: |
+          SIZE=$(wc -c < build/release.wasm)
+          echo "WASM size: $SIZE bytes"
+          echo "wasm_size=$SIZE" >> $GITHUB_OUTPUT
+          # Warn if size exceeds 10KB
+          if [ $SIZE -gt 10240 ]; then
+            echo "::warning::WASM size is larger than 10KB"
+          fi
+
+      - name: Comment size on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const size = fs.statSync('build/release.wasm').size;
+            const sizeKB = (size / 1024).toFixed(2);
+            const comment = `### 📦 WebAssembly Bundle Size\n\n**Current size:** ${size} bytes (${sizeKB} KB)`;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+
+  validate:
+    name: Validate WASM
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build WebAssembly
+        run: bun run asbuild:release
+
+      - name: Validate WASM binary
+        run: |
+          node -e "
+          const fs = require('fs');
+          const buffer = fs.readFileSync('build/release.wasm');
+          const header = buffer.slice(0, 4);
+          const magic = Buffer.from([0x00, 0x61, 0x73, 0x6D]); // \\0asm
+          if (!header.equals(magic)) {
+            console.error('Invalid WASM magic number');
+            process.exit(1);
+          }
+          console.log('✓ Valid WASM magic number');
+          console.log('✓ WASM version:', buffer[4]);
+          "
+
+  wasm-shrink:
+    name: Try to shrink WASM
+    runs-on: ubuntu-latest
+    needs: size
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build with different optimizations
+        run: |
+          # Build with shrinkLevel 2 (maximum shrinking)
+          asc assembly/index.ts --target release --exportRuntime --optimizeLevel 3 --shrinkLevel 2 --converge -o build/shrunk.wasm
+          echo "Optimized build created"
+
+      - name: Compare sizes
+        run: |
+          ORIGINAL=$(wc -c < build/release.wasm)
+          SHRUNK=$(wc -c < build/shrunk.wasm)
+          SAVINGS=$((ORIGINAL - SHRUNK))
+          PERCENT=$((SAVINGS * 100 / ORIGINAL))
+          echo "Original: $ORIGINAL bytes"
+          echo "Shrunk: $SHRUNK bytes"
+          echo "Savings: $SAVINGS bytes ($PERCENT%)"

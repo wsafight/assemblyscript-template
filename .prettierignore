@@ -1,0 +1,25 @@
+# Build outputs
+build/
+dist/
+out/
+
+# Dependencies
+node_modules/
+
+# Coverage
+coverage/
+
+# Lock files (except bun.lock for reference)
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+*.lock
+
+# Release artifacts
+release/
+*.tar.gz
+
+# Temporary files
+.cache/
+tmp/
+temp/

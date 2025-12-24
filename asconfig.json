@@ -1,0 +1,20 @@
+{
+  "extends": "./node_modules/assemblyscript/std/assembly.json",
+  "include": ["./assembly/**/*"],
+  "exclude": ["./assembly/**/*.spec.ts"],
+  "targets": {
+    "debug": {
+      "sourceMap": true,
+      "debug": true,
+      "optimizeLevel": 0,
+      "shrinkLevel": 0
+    },
+    "release": {
+      "sourceMap": true,
+      "optimizeLevel": 3,
+      "shrinkLevel": 2,
+      "noAssert": true,
+      "converge": true
+    }
+  }
+}

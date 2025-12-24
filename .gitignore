@@ -1,0 +1,47 @@
+# Build outputs
+build/
+dist/
+out/
+
+# WASM files (optional - uncomment if you want to ignore)
+# *.wasm
+
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+bun.lockb
+
+# Coverage
+coverage/
+*.lcov
+.nyc_output/
+
+# IDE
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Release artifacts
+release/
+*.tar.gz
+
+# Temporary files
+.cache/
+tmp/
+temp/

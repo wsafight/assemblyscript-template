@@ -1,0 +1,42 @@
+{
+  "editor.formatOnSave": true,
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": "explicit"
+  },
+  "eslint.experimental.useFlatConfig": true,
+  "typescript.tsdk": "node_modules/typescript/lib",
+  // AssemblyScript support
+  "files.associations": {
+    "*.ts": "typescript"
+  },
+  // Enable IntelliSense for AssemblyScript types in assembly folder
+  "[typescript]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[javascript]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  // Exclude from file explorer
+  "files.exclude": {
+    "**/.git": true,
+    "**/.DS_Store": true,
+    "**/node_modules": true,
+    "**/build": true,
+    "**/coverage": true
+  },
+  // Exclude from search
+  "search.exclude": {
+    "**/build": true,
+    "**/coverage": true,
+    "**/node_modules": true,
+    "**/*.wasm": true,
+    "**/*.wasm.map": true
+  },
+  // Watch ignored files
+  "files.watcherExclude": {
+    "**/build/**": true,
+    "**/coverage/**": true,
+    "**/node_modules/**": true
+  }
+}
